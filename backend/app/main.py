@@ -5,7 +5,6 @@ from .api.websocket import GestureWebSocket
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -14,7 +13,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize WebSocket manager
 gesture_ws = GestureWebSocket()
 
 @app.websocket("/ws/gesture")
@@ -32,3 +30,6 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/")
 async def root():
     return {"message": "Gesture Recognition API"}
+
+
+

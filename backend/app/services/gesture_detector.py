@@ -15,7 +15,6 @@ class GestureDetector:
         self.FONT_THICKNESS = 2
         self.TEXT_COLOR = (0, 255, 0)  
         
-        # Initialize MediaPipe
         base_options = python.BaseOptions(model_asset_path=model_path, delegate="GPU")
         self.options = vision.GestureRecognizerOptions(
             base_options=base_options,
@@ -34,19 +33,15 @@ class GestureDetector:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
         
-        # Perform gesture recognition
         results_gesture = self.recognizer.recognize_for_video(mp_image, frame_timestamp_ms)
         
-        # Create annotated image
         annotated_image = np.copy(rgb_frame)
         
-        # Process results
         processed_results = self._process_and_draw_results(
             results_gesture, 
             annotated_image
         )
         
-        # Convert back to BGR for web display
         output_frame = cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR)
         
         return processed_results, output_frame
@@ -64,14 +59,12 @@ class GestureDetector:
                 handedness = results_gesture.handedness[idx]
                 gesture = results_gesture.gestures[idx] if results_gesture.gestures else None
 
-                # Convert landmarks to proto format for drawing
                 hand_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
                 hand_landmarks_proto.landmark.extend([
                     landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z)
                     for landmark in hand_landmarks
                 ])
 
-                # Draw landmarks
                 mp.solutions.drawing_utils.draw_landmarks(
                     annotated_image,
                     hand_landmarks_proto,
@@ -80,21 +73,17 @@ class GestureDetector:
                     mp.solutions.drawing_styles.get_default_hand_connections_style()
                 )
 
-                # Calculate text position
                 x_coords = [lm.x for lm in hand_landmarks]
                 y_coords = [lm.y for lm in hand_landmarks]
                 text_x = int(min(x_coords) * width_i)
                 text_y = int(min(y_coords) * height_i) - self.MARGIN
 
-                # Handle hand laterality
                 current_hand = handedness[0].category_name
                 if self.is_flip:
                     current_hand = "Right" if current_hand == "Left" else "Left"
 
-                # Get gesture label
                 gesture_label = gesture[0].category_name if gesture else "Unknown"
 
-                # Draw text
                 cv2.putText(
                     annotated_image,
                     f"{current_hand} {gesture_label}",
@@ -106,7 +95,6 @@ class GestureDetector:
                     cv2.LINE_AA
                 )
 
-                # Store results
                 result = {
                     "hand_index": idx,
                     "handedness": current_hand,
