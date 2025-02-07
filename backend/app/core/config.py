@@ -1,11 +1,12 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    MODEL_PATH: str
-    CAMERA_WIDTH: int
-    CAMERA_HEIGHT: int
+    API_V1_STR: str = "/api/v1"
+    PROJECT_NAME: str = "Gesture Detection API"
+    MODEL_PATH: str = "model/gesture/gesture_recognizer.task"
+    CORS_ORIGINS: list = ["http://localhost:3000"] 
     
     class Config:
-        env_file = ".env"
+        case_sensitive = True
 
 settings = Settings()
