@@ -1,0 +1,20 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    # TODO : Uncomment if volumes
+    # volumes:
+    #   - ./backend/datasets:/app/datasets
+    #   - ./backend/model:/app/model
+
+  frontend:
+    build:
+      context: ./frontend-next  
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
