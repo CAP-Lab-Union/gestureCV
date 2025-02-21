@@ -118,9 +118,11 @@ def train_model(training_images: list[str], gesture_name: str,
     none_dir = os.path.join(temp_dataset_dir, "None")
     os.makedirs(none_dir, exist_ok=True)
 
+    # This the gesture name below, custom_folder is the folder where the images
     custom_folder = os.path.join(temp_dataset_dir, f"z_{gesture_name}")
     os.makedirs(custom_folder, exist_ok=True)
 
+    # TODO: The labeling issue is below, (line 126 - 134). 
     valid_images = 0
     for idx, img_b64 in enumerate(training_images):
         try:
@@ -130,6 +132,14 @@ def train_model(training_images: list[str], gesture_name: str,
             valid_images += 1
         except Exception:
             continue
+
+    # labels = [] 
+    # valid_images = 0
+    # for idx, img_b64 in enumerate(training_images):
+    #     img = decode_image(img_b64)
+    #     img_filename = os.path.join(custom_folder, f"img_{idx}.jpg")
+    #     cv2.imwrite(img_filename, img)
+    #     valid_images += 1 
 
     if valid_images == 0:
         raise ValueError("No valid images provided for training.")
