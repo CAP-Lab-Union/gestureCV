@@ -5,6 +5,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+
+
+    # Dont change this , this is the for the gesture models
     volumes:
       - ./backend/gestureModels:/app/gestureModels
 

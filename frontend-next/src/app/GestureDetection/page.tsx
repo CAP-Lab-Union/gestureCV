@@ -21,6 +21,7 @@ const GestureDetection = () => {
   // Training state
   const [isTrainingMode, setIsTrainingMode] = useState(false);
   const [trainingStatus, setTrainingStatus] = useState('');
+  const [gestureName, setGestureName] = useState(''); // New state for custom gesture name
   // Use a ref for training frames
   const trainingFramesRef = useRef<string[]>([]);
 
@@ -62,7 +63,7 @@ const GestureDetection = () => {
       };
       
       ws.onmessage = (event) => {
-        const { gestures, processed_frame } = JSON.parse(event.data); // Destructuring directly
+        const { gestures, processed_frame } = JSON.parse(event.data);
         setGestures(gestures || []);
         if (processed_frame) {
           setAnnotatedFrame(processed_frame);
@@ -107,6 +108,12 @@ const GestureDetection = () => {
   }, [isConnected, isTrainingMode]);
 
   const handleStartTraining = async () => {
+    // Ensure a gesture name is provided
+    if (!gestureName.trim()) {
+      setTrainingStatus("Please enter a gesture name.");
+      return;
+    }
+    
     trainingFramesRef.current = [];
     setTrainingStatus("Capturing training data...");
     setIsTrainingMode(true);
@@ -120,7 +127,7 @@ const GestureDetection = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             training_images: trainingFramesRef.current,
-            gesture_label: 0
+            gesture_name: gestureName  // Send custom gesture name
           })
         });
         if (response.ok) {
@@ -135,7 +142,6 @@ const GestureDetection = () => {
       }
     }, 10000); // Training capture duration 
   };
-
 
   return (
     <div className="p-4">
@@ -181,7 +187,14 @@ const GestureDetection = () => {
               </div>
             )}
           </div>
-          <div className="flex justify-center mt-4">
+          <div className="flex flex-col items-center mt-4">
+            <input 
+              type="text" 
+              placeholder="Enter gesture name" 
+              value={gestureName}
+              onChange={(e) => setGestureName(e.target.value)}
+              className="mb-4 border border-gray-300 p-2 rounded w-full max-w-xs"
+            />
             <button
               onClick={handleStartTraining}
               disabled={isTrainingMode}
