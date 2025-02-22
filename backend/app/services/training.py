@@ -84,18 +84,15 @@
 # # TODO: MediaPipe Model Maker Implementation
 # # =============================================
 
-
 import os
 import base64
 import cv2
 import numpy as np
-import tensorflow as tf
 import shutil
 from mediapipe_model_maker import gesture_recognizer
 
 def decode_image(base64_str, frame_width=224, frame_height=224):
-
-    """"Decode the base 64 image string and resize it to the specified dimensions."""
+    """Decode base64 image string and resize to specified dimensions."""
     try:
         if ',' in base64_str:
             base64_str = base64_str.split(',')[1]
@@ -109,75 +106,88 @@ def decode_image(base64_str, frame_width=224, frame_height=224):
         raise ValueError(f"Error decoding image: {e}")
 
 def train_model(training_images: list[str], gesture_name: str,
-                learning_rate: float = 0.001, epochs: int = 5, batch_size: int = 8,
-                validation_batch_size: int = 8):
-    """""Accepts a list of base64-encoded images and a gesture name,decodes and preprocesses the images, trains a simple CNN, and saves the model."""
+                learning_rate: float = 0.001, epochs: int = 30, 
+                batch_size: int = 1, validation_batch_size: int = 1):
+    """
+    Accepts base64-encoded images and trains a gesture recognition model.
+    """
+    if not gesture_name:
+        raise ValueError("Gesture name must be provided for training.")
+
+    # Create temporary dataset structure
     temp_dataset_dir = os.path.join(os.getcwd(), "gestureDataset_temp")
-    os.makedirs(temp_dataset_dir, exist_ok=True)
+    shutil.rmtree(temp_dataset_dir, ignore_errors=True)  # Clean previous runs
     
+    # Create class directories
+    gesture_dir = os.path.join(temp_dataset_dir, gesture_name)
     none_dir = os.path.join(temp_dataset_dir, "None")
+    os.makedirs(gesture_dir, exist_ok=True)
     os.makedirs(none_dir, exist_ok=True)
 
-    # This the gesture name below, custom_folder is the folder where the images
-    custom_folder = os.path.join(temp_dataset_dir, f"z_{gesture_name}")
-    os.makedirs(custom_folder, exist_ok=True)
-
-    # TODO: The labeling issue is below, (line 126 - 134). 
+    # Save valid gesture images
     valid_images = 0
     for idx, img_b64 in enumerate(training_images):
         try:
             img = decode_image(img_b64)
-            img_filename = os.path.join(custom_folder, f"img_{idx}.jpg")
-            cv2.imwrite(img_filename, img)
+            cv2.imwrite(os.path.join(gesture_dir, f"gesture_{idx}.jpg"), img)
             valid_images += 1
-        except Exception:
+        except Exception as e:
+            print(f"Skipping invalid image: {e}")
             continue
 
-    # labels = [] 
-    # valid_images = 0
-    # for idx, img_b64 in enumerate(training_images):
-    #     img = decode_image(img_b64)
-    #     img_filename = os.path.join(custom_folder, f"img_{idx}.jpg")
-    #     cv2.imwrite(img_filename, img)
-    #     valid_images += 1 
+    if valid_images < 10:  # Minimum samples check
+        raise ValueError(f"At least 10 valid images required, got {valid_images}")
 
-    if valid_images == 0:
-        raise ValueError("No valid images provided for training.")
+    # Add real negative samples to "None" class (critical fix)
+    # Replace this with actual background/negative images if available
+    # Here we create simple blank images as placeholder negatives
+    for i in range(max(1, valid_images // 5)):  # 20% of gesture images
+        blank = np.zeros((224, 224, 3), dtype=np.uint8)
+        cv2.imwrite(os.path.join(none_dir, f"none_{i}.jpg"), blank)
 
+    # Load and verify dataset
+    try:
+        data = gesture_recognizer.Dataset.from_folder(
+            dirname=temp_dataset_dir,
+            hparams=gesture_recognizer.HandDataPreprocessingParams()
+        )
+    except ValueError as e:
+        raise RuntimeError(f"Dataset error: {e}. Check folder structure and images.")
 
-    if not os.listdir(none_dir):
-        placeholder = os.path.join(custom_folder, os.listdir(custom_folder)[0])
-        cv2.imwrite(os.path.join(none_dir, "img_none.jpg"), cv2.imread(placeholder))
+    # Improved dataset splitting
+    train_data, test_data = data.split(0.9)
+    validation_data, test_data = test_data.split(0.5)
 
-    data = gesture_recognizer.Dataset.from_folder(
-        dirname=temp_dataset_dir,
-        hparams=gesture_recognizer.HandDataPreprocessingParams()
-    )
-    
-    train_data, rest_data = data.split(0.8)
-    validation_data, test_data = rest_data.split(0.5)
-
+    # Configure training
     export_dir = os.path.join(os.getcwd(), "gestureModels")
     os.makedirs(export_dir, exist_ok=True)
-
+    
     hparams = gesture_recognizer.HParams(
         export_dir=export_dir,
         learning_rate=learning_rate,
         epochs=epochs,
-        batch_size=batch_size
+        batch_size=batch_size,
     )
-    options = gesture_recognizer.GestureRecognizerOptions(hparams=hparams)
+    
+    options = gesture_recognizer.GestureRecognizerOptions(
+        hparams=hparams,
+        model_options=gesture_recognizer.ModelOptions(dropout_rate=0.3)
+    )
 
+    # Train model
     model = gesture_recognizer.GestureRecognizer.create(
         train_data=train_data,
         validation_data=validation_data,
         options=options
     )
-    
-    _ = model.evaluate(test_data, batch_size=validation_batch_size)
-    
 
-    export_name = f"gesture_model_{gesture_name}"
-    model.export_model(model_name=export_name + ".task")
+    # Evaluate and export
+    evaluation = model.evaluate(test_data, batch_size=validation_batch_size)
+    print(f"Model evaluation results: {evaluation}")
     
+    export_name = f"gesture_model_{gesture_name}.task"
+    model.export_model(os.path.join(export_dir, export_name))
+    
+    # Cleanup
     shutil.rmtree(temp_dataset_dir)
+    return os.path.join(export_dir, export_name)
