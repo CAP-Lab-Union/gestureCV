@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .api.websocket import GestureWebSocket
+from .api import train_gesture 
 
 from .api import training  
 
@@ -34,3 +35,4 @@ async def root():
     return {"message": "Gesture Recognition API"}
 
 app.include_router(training.router)
+app.include_router(train_gesture.router)
