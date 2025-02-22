@@ -10,6 +10,8 @@ services:
     # Dont change this , this is the for the gesture models
     volumes:
       - ./backend/gestureModels:/app/gestureModels
+      # - ./gesture_imgs:/app/gesture_imgs
+      # - ./exported_models:/app/exported_models
 
   frontend:
     build:
@@ -19,3 +21,53 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+
+
+
+# version: '3.8'
+
+# services:
+#   backend:
+#     build: ./backend
+#     volumes:
+#       - ./data/models:/app/saved_models
+#       - ./data/datasets:/app/gesture_dataset
+#       - ./data/temp:/app/training_temp
+#     environment:
+#       - MODEL_SAVE_PATH=/app/saved_models
+#       - DATASET_ROOT=/app/gesture_dataset
+#       - TEMP_TRAINING_DIR=/app/training_temp
+#     networks:
+#       - gesture-net
+
+#   frontend:
+#     build: ./frontend
+#     volumes:
+#       - ./frontend:/app
+#       - /app/node_modules
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - NEXT_PUBLIC_API_URL=http://backend:8000
+#     networks:
+#       - gesture-net
+#     depends_on:
+#       - backend
+
+# networks:
+#   gesture-net:
+#     driver: bridge
+
+# volumes:
+#   models:
+#     driver: local
+#     driver_opts:
+#       o: bind
+#       type: none
+#       device: ./data/models
+#   datasets:
+#     driver: local
+#     driver_opts:
+#       o: bind
+#       type: none
+#       device: ./data/datasets
