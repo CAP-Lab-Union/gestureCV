@@ -7,7 +7,7 @@ from ..services.training import train_model_real_time
 router = APIRouter(prefix="/gesture", tags=["gesture_training"])
 
 class TrainModelRequest(BaseModel):
-    training_images: List[str]  # Base64-encoded images
+    training_images: List[str]  
     gesture_name: str
     learning_rate: float = 0.001
     epochs: int = 5
