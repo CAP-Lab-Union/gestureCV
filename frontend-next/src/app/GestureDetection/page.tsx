@@ -1,10 +1,10 @@
-"use client"
-import React, { useEffect, useRef, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import Image from 'next/image'; 
+"use client";
+import React, { useEffect, useRef, useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import Image from "next/image";
 
 interface Gesture {
-  handedness: string; 
+  handedness: string;
   gesture: string;
 }
 
@@ -12,56 +12,53 @@ const GestureDetection = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  
-  // Detection state
+
+  // Detection
   const [isConnected, setIsConnected] = useState(false);
   const [gestures, setGestures] = useState<Gesture[]>([]);
-  const [annotatedFrame, setAnnotatedFrame] = useState<string>('');
-  
-  // Training state
+  const [annotatedFrame, setAnnotatedFrame] = useState<string>("");
+
+  // Training
   const [isTrainingMode, setIsTrainingMode] = useState(false);
-  const [trainingStatus, setTrainingStatus] = useState('');
-  const [gestureName, setGestureName] = useState(''); // New state for custom gesture name
-  // Use a ref for training frames
+  const [trainingStatus, setTrainingStatus] = useState("");
+  const [gestureName, setGestureName] = useState("");
   const trainingFramesRef = useRef<string[]>([]);
 
-  // Always set up the camera and keep it running
+  // Camera
   useEffect(() => {
     const setupCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: 640, height: 480 } 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 },
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
       } catch (err) {
-        console.error('Error accessing camera:', err);
+        console.error("Error accessing camera:", err);
       }
     };
     setupCamera();
   }, []);
 
-  // WebSocket for real-time detection
+  // WebSocket
   useEffect(() => {
-    if (isTrainingMode) {
-      return;
-    }
-    
+    if (isTrainingMode) return;
+
     const setupWebSocket = () => {
-      const ws = new WebSocket('ws://localhost:8000/ws/gesture');
-      
+      const ws = new WebSocket("ws://localhost:8000/ws/gesture");
+
       ws.onopen = () => {
         setIsConnected(true);
-        console.log('Connected to WebSocket');
+        console.log("Connected to WebSocket");
       };
-      
+
       ws.onclose = () => {
         setIsConnected(false);
-        console.log('Disconnected from WebSocket');
+        console.log("Disconnected from WebSocket");
         setTimeout(setupWebSocket, 2000);
       };
-      
+
       ws.onmessage = (event) => {
         const { gestures, processed_frame } = JSON.parse(event.data);
         setGestures(gestures || []);
@@ -69,37 +66,33 @@ const GestureDetection = () => {
           setAnnotatedFrame(processed_frame);
         }
       };
-      
+
       wsRef.current = ws;
     };
 
     setupWebSocket();
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      if (wsRef.current) wsRef.current.close();
     };
   }, [isTrainingMode]);
 
-  // Capture frames for detection or training
+  // Capture gest
   useEffect(() => {
     const captureFrame = () => {
       if (!videoRef.current || !canvasRef.current) return;
       const canvas = canvasRef.current;
       const video = videoRef.current;
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext("2d");
       if (!context) return;
-      
+
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const base64Frame = canvas.toDataURL('image/jpeg', 0.8);
-      
+      const base64Frame = canvas.toDataURL("image/jpeg", 0.8);
+
       if (isTrainingMode) {
         trainingFramesRef.current.push(base64Frame);
-      } else {
-        if (wsRef.current && isConnected) {
-          wsRef.current.send(base64Frame);
-        }
+      } else if (wsRef.current && isConnected) {
+        wsRef.current.send(base64Frame);
       }
     };
 
@@ -107,40 +100,54 @@ const GestureDetection = () => {
     return () => clearInterval(intervalId);
   }, [isConnected, isTrainingMode]);
 
-  const handleStartTraining = async () => {
-    // Ensure a gesture name is provided
+  // Training
+  const handleStartTraining = async (mode: "sync" | "async" = "async") => {
     if (!gestureName.trim()) {
       setTrainingStatus("Please enter a gesture name.");
       return;
     }
-    
+
     trainingFramesRef.current = [];
     setTrainingStatus("Capturing training data...");
     setIsTrainingMode(true);
 
     setTimeout(async () => {
-      setIsTrainingMode(false); 
-      setTrainingStatus("Sending training data to backend...");
+      setIsTrainingMode(false);
+      setTrainingStatus(`Sending ${trainingFramesRef.current.length} frames to backend...`);
+
       try {
-        const response = await fetch("http://localhost:8000/train", {
+        const endpoint =
+          mode === "sync"
+            ? "http://localhost:8000/gesture/train/sync"
+            : "http://localhost:8000/gesture/train/async";
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             training_images: trainingFramesRef.current,
-            gesture_name: gestureName  // Send custom gesture name
-          })
+            gesture_name: gestureName,
+            //TODO: Frontend or backend for these below
+            learning_rate: 0.001,
+            epochs: 5,
+            batch_size: 1,
+          }),
         });
+
+        const result = await response.json();
         if (response.ok) {
-          await response.json();
-          setTrainingStatus("Training finished.");
+          setTrainingStatus(
+            mode === "sync"
+              ? `Training finished: ${result.message}`
+              : "Training queued successfully."
+          );
         } else {
-          setTrainingStatus("Error: Failed to train gesture");
+          setTrainingStatus(`Error: ${result.detail || "Training failed"}`);
         }
       } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : "Unknown error";
         setTrainingStatus(`Error: ${errMsg}`);
       }
-    }, 10000); // Training capture duration 
+    }, 10000); 
   };
 
   return (
@@ -163,8 +170,8 @@ const GestureDetection = () => {
                 src={annotatedFrame}
                 alt="Annotated Gesture Frame"
                 className="w-full rounded-lg"
-                width={640} 
-                height={480} 
+                width={640}
+                height={480}
               />
             )}
             <div className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded">
@@ -176,8 +183,12 @@ const GestureDetection = () => {
                 </div>
               ))}
             </div>
-            <div className={`absolute top-4 right-4 p-2 rounded ${isConnected ? 'bg-green-500' : 'bg-red-500'} text-white`}>
-              {isConnected ? 'Connected' : 'Disconnected'}
+            <div
+              className={`absolute top-4 right-4 p-2 rounded ${
+                isConnected ? "bg-green-500" : "bg-red-500"
+              } text-white`}
+            >
+              {isConnected ? "Connected" : "Disconnected"}
             </div>
             {isTrainingMode && (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -188,20 +199,29 @@ const GestureDetection = () => {
             )}
           </div>
           <div className="flex flex-col items-center mt-4">
-            <input 
-              type="text" 
-              placeholder="Enter gesture name" 
+            <input
+              type="text"
+              placeholder="Enter gesture name"
               value={gestureName}
               onChange={(e) => setGestureName(e.target.value)}
               className="mb-4 border border-gray-300 p-2 rounded w-full max-w-xs"
             />
-            <button
-              onClick={handleStartTraining}
-              disabled={isTrainingMode}
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-            >
-              Start Training
-            </button>
+            <div className="flex gap-4">
+              <button
+                onClick={() => handleStartTraining("sync")}
+                disabled={isTrainingMode}
+                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Train (Sync)
+              </button>
+              <button
+                onClick={() => handleStartTraining("async")}
+                disabled={isTrainingMode}
+                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Train (Async)
+              </button>
+            </div>
           </div>
           {trainingStatus && (
             <div className="mt-2 text-center">
